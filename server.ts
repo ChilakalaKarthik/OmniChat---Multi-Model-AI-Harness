@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { handleChatStream } from './server/chatHandler';
@@ -297,25 +298,45 @@ async function startServer() {
   });
 
   // Setup static serving or Vite middleware
-  const isProduction = process.env.NODE_ENV !== 'development';
+  const distPath = path.resolve(__dirname, 'dist');
+  const hasBuiltDist = fs.existsSync(distPath);
+  const isProduction = hasBuiltDist || process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
 
-  if (isProduction) {
-    const distPath = path.resolve(__dirname, 'dist');
+  if (isProduction && hasBuiltDist) {
+    console.log('[OmniChat] Serving production static assets from:', distPath);
     app.use(express.static(distPath));
     app.get('*', (_req: Request, res: Response) => {
-      res.sendFile(path.resolve(distPath, 'index.html'));
+      const indexPath = path.resolve(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('Index file not found in dist directory.');
+      }
     });
   } else {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+    try {
+      console.log('[OmniChat] Starting Vite dev server middleware...');
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (viteErr) {
+      console.warn('[OmniChat] Vite dev middleware failed to initialize, checking for static assets...', viteErr);
+      if (hasBuiltDist) {
+        app.use(express.static(distPath));
+        app.get('*', (_req: Request, res: Response) => {
+          res.sendFile(path.resolve(distPath, 'index.html'));
+        });
+      } else {
+        console.error('[OmniChat] Critical: No dist directory found and Vite failed to load.');
+      }
+    }
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[OmniChat] Server running at http://0.0.0.0:${PORT} (${isProduction ? 'production' : 'development'})`);
+    console.log(`[OmniChat] Server running at http://0.0.0.0:${PORT} (${isProduction && hasBuiltDist ? 'production' : 'development'})`);
   });
 }
 
