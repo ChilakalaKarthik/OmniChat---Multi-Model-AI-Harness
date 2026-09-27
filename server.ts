@@ -297,7 +297,7 @@ async function startServer() {
   });
 
   // Setup static serving or Vite middleware
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV !== 'development';
 
   if (isProduction) {
     const distPath = path.resolve(__dirname, 'dist');
