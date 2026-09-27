@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ApiKeys, ProviderId, KeyTestResult, ModelAvailabilityMap } from '../types';
+import { ApiKeys, ProviderId, KeyTabId, KeyTestResult, ModelAvailabilityMap } from '../types';
 import {
   getStoredApiKeys,
   saveStoredApiKeys,
@@ -12,13 +12,14 @@ import { AVAILABLE_MODELS } from '../constants/models';
 
 export function useApiKeys() {
   const [keys, setKeys] = useState<ApiKeys>(getStoredApiKeys);
-  const [testResults, setTestResults] = useState<Record<ProviderId, KeyTestResult | null>>({
+  const [testResults, setTestResults] = useState<Record<string, KeyTestResult | null>>({
     openai: null,
     anthropic: null,
     gemini: null,
     xai: null,
+    tavily: null,
   });
-  const [testingProvider, setTestingProvider] = useState<ProviderId | null>(null);
+  const [testingProvider, setTestingProvider] = useState<KeyTabId | null>(null);
 
   // Model availability tracking: modelId -> boolean (true = verified available, false = unavailable on account)
   const [modelAvailability, setModelAvailability] = useState<ModelAvailabilityMap>(
@@ -40,7 +41,7 @@ export function useApiKeys() {
   }, []);
 
   const hasKey = useCallback(
-    (provider: ProviderId): boolean => {
+    (provider: ProviderId | 'tavily'): boolean => {
       const key = keys[provider];
       return typeof key === 'string' && key.trim().length > 0;
     },
@@ -48,7 +49,7 @@ export function useApiKeys() {
   );
 
   const setKey = useCallback(
-    (provider: ProviderId, value: string) => {
+    (provider: KeyTabId, value: string) => {
       const next = { ...keys, [provider]: value.trim() };
       if (!value.trim()) {
         delete next[provider];
@@ -61,19 +62,21 @@ export function useApiKeys() {
     [keys]
   );
 
-  const removeKey = useCallback((provider: ProviderId) => {
+  const removeKey = useCallback((provider: KeyTabId) => {
     clearStoredApiKey(provider);
     setKeys(getStoredApiKeys());
     setTestResults((prev) => ({ ...prev, [provider]: null }));
-    // Clear availability for this provider's models
-    setModelAvailability((prev) => {
-      const next = { ...prev };
-      AVAILABLE_MODELS.filter((m) => m.provider === provider).forEach((m) => {
-        delete next[m.id];
+    // Clear availability for this provider's models if applicable
+    if (provider !== 'tavily') {
+      setModelAvailability((prev) => {
+        const next = { ...prev };
+        AVAILABLE_MODELS.filter((m) => m.provider === provider).forEach((m) => {
+          delete next[m.id];
+        });
+        saveStoredModelAvailability(next);
+        return next;
       });
-      saveStoredModelAvailability(next);
-      return next;
-    });
+    }
   }, []);
 
   const clearAll = useCallback(() => {
@@ -84,18 +87,19 @@ export function useApiKeys() {
       anthropic: null,
       gemini: null,
       xai: null,
+      tavily: null,
     });
     setModelAvailability({});
     saveStoredModelAvailability({});
   }, []);
 
   const testKey = useCallback(
-    async (provider: ProviderId, testKeyValue?: string): Promise<KeyTestResult> => {
+    async (provider: KeyTabId, testKeyValue?: string): Promise<KeyTestResult> => {
       const apiKey = (testKeyValue ?? keys[provider] ?? '').trim();
       if (!apiKey) {
         const res: KeyTestResult = {
           ok: false,
-          provider,
+          provider: provider as any,
           reason: `No API key entered for ${provider}.`,
         };
         setTestResults((prev) => ({ ...prev, [provider]: res }));
@@ -113,7 +117,7 @@ export function useApiKeys() {
         const data = await response.json();
         const result: KeyTestResult = {
           ok: Boolean(data.ok),
-          provider,
+          provider: provider as any,
           reason: data.reason,
           message: data.message || (data.ok ? 'Key verified successfully' : 'Verification failed'),
         };
@@ -124,7 +128,7 @@ export function useApiKeys() {
         const errorMessage = err instanceof Error ? err.message : 'Network error testing API key';
         const result: KeyTestResult = {
           ok: false,
-          provider,
+          provider: provider as any,
           reason: errorMessage,
         };
         setTestResults((prev) => ({ ...prev, [provider]: result }));

@@ -21,11 +21,16 @@ interface SidebarProps {
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
   hasKey: (provider: ProviderId) => boolean;
-  onOpenKeysModal: () => void;
+  hasTavilyKey?: boolean;
+  hasGmailConnected?: boolean;
+  webSearchEnabled: boolean;
+  onToggleWebSearch: () => void;
+  onOpenKeysModal: (initialTab?: string) => void;
   currentProvider: ProviderId;
   onSelectProvider: (provider: ProviderId) => void;
   onOpenToolPreview: (tool: 'rag' | 'gmail') => void;
   onOpenDocModal: () => void;
+  onOpenGmailModal: () => void;
   activeDoc?: DocumentAttachment;
 }
 
@@ -36,11 +41,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewSession,
   onDeleteSession,
   hasKey,
+  hasTavilyKey,
+  hasGmailConnected,
+  webSearchEnabled,
+  onToggleWebSearch,
   onOpenKeysModal,
   currentProvider,
   onSelectProvider,
-  onOpenToolPreview,
   onOpenDocModal,
+  onOpenGmailModal,
   activeDoc,
 }) => {
   return (
@@ -116,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Model Providers</span>
             <button
               type="button"
-              onClick={onOpenKeysModal}
+              onClick={() => onOpenKeysModal()}
               className="text-neutral-400 hover:text-neutral-200 flex items-center gap-1 text-[10px] lowercase hover:underline"
             >
               <span>manage</span>
@@ -181,15 +190,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <div className="space-y-1">
             {/* Web Search */}
-            <div className="px-2.5 py-2 rounded-lg bg-neutral-900/50 border border-neutral-850 text-xs flex items-center justify-between text-neutral-300">
+            <button
+              type="button"
+              onClick={() => {
+                if (currentProvider !== 'gemini' && !hasTavilyKey) {
+                  onOpenKeysModal('tavily');
+                } else {
+                  onToggleWebSearch();
+                }
+              }}
+              className={`w-full text-left px-2.5 py-2 rounded-lg border text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                webSearchEnabled
+                  ? 'bg-blue-950/50 border-blue-800/80 text-blue-300 hover:bg-blue-900/60'
+                  : 'bg-neutral-900/40 hover:bg-neutral-900 border-neutral-850 text-neutral-300 hover:text-white'
+              }`}
+            >
               <div className="flex items-center gap-2">
                 <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                 <span className="font-medium">Web Search</span>
               </div>
-              <span className="text-[10px] font-mono text-neutral-400">
-                {currentProvider === 'gemini' ? 'Gemini Grounding' : 'SearXNG'}
+              <span className="text-[10px] font-mono">
+                {webSearchEnabled ? (
+                  <span className="flex items-center gap-1 text-blue-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    enabled
+                  </span>
+                ) : (
+                  <span className="text-neutral-500">
+                    {currentProvider === 'gemini'
+                      ? 'Off'
+                      : hasTavilyKey
+                      ? 'Off'
+                      : 'Needs Key'}
+                  </span>
+                )}
               </span>
-            </div>
+            </button>
 
             {/* Document RAG Action Button (Phase 3 Active) */}
             <button
@@ -216,33 +252,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </button>
 
-            {/* Gmail OAuth Preview Button */}
+            {/* Gmail Assistant Action Button */}
             <button
               type="button"
-              onClick={() => onOpenToolPreview('gmail')}
-              className="w-full text-left px-2.5 py-2 rounded-lg bg-neutral-900/30 hover:bg-neutral-900 border border-neutral-850 text-xs flex items-center justify-between text-neutral-400 hover:text-neutral-200 transition-colors"
+              onClick={onOpenGmailModal}
+              className={`w-full text-left px-2.5 py-2 rounded-lg border text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                hasGmailConnected
+                  ? 'bg-rose-950/40 border-rose-800/80 text-rose-300 hover:bg-rose-900/50'
+                  : 'bg-neutral-900/40 hover:bg-neutral-900 border-neutral-850 text-neutral-300 hover:text-white'
+              }`}
             >
               <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                 <span>Gmail Assistant</span>
               </div>
-              <span className="text-[10px] text-neutral-500 font-mono">Phase 5</span>
+              <span className="text-[10px] font-mono">
+                {hasGmailConnected ? (
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    connected
+                  </span>
+                ) : (
+                  <span className="text-neutral-500">Connect</span>
+                )}
+              </span>
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Footer Notice & Security Guarantee */}
-      <div className="p-3 border-t border-neutral-850 bg-neutral-950/80 space-y-2">
-        <div className="flex items-start gap-2 text-[11px] text-neutral-500 leading-relaxed">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-          <span>
-            Keys held in this tab&apos;s <code className="text-neutral-400 font-mono">sessionStorage</code> only. No database, no server logs.
-          </span>
-        </div>
-        <p className="text-[10px] text-neutral-600 leading-tight">
-          Conversations are not saved across page refresh.
-        </p>
       </div>
     </aside>
   );

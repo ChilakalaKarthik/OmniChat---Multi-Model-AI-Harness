@@ -15,7 +15,10 @@ export interface ApiKeys {
   anthropic?: string;
   gemini?: string;
   xai?: string;
+  tavily?: string;
 }
+
+export type KeyTabId = ProviderId | 'tavily';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
@@ -48,10 +51,11 @@ export interface ChatMessage {
   timestamp: number;
   modelUsed?: string;
   providerUsed?: ProviderId;
-  groundingUsed?: 'gemini_google_search' | 'searxng' | 'document' | null;
+  groundingUsed?: 'gemini_google_search' | 'tavily' | 'searxng' | 'document' | null;
   docGroundingStatus?: 'grounded' | 'no_document_loaded';
   webSources?: WebSource[];
   webSearchFallback?: boolean;
+  webSearchFallbackReason?: string;
   searchStatus?: string | null;
   error?: string;
   errorType?: MessageErrorType;

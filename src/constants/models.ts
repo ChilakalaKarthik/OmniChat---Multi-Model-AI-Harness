@@ -69,6 +69,19 @@ export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
   },
 };
 
+export const TAVILY_META = {
+  id: 'tavily' as const,
+  name: 'Tavily Search',
+  shortName: 'Tavily',
+  tagline: 'AI search engine API for model web grounding (1,000 free searches/month)',
+  keyPrefix: 'tvly-',
+  keyHelpUrl: 'https://app.tavily.com',
+  placeholder: 'tvly-...',
+  accentColor: '#06b6d4',
+  badgeBg: 'bg-cyan-950/60',
+  badgeText: 'text-cyan-400',
+};
+
 export const AVAILABLE_MODELS: ModelOption[] = [
   // OpenAI
   {

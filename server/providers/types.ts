@@ -13,6 +13,8 @@ export interface ChatRequestBody {
   contextChunks?: string[];
   docId?: string;
   webSearch?: boolean;
+  tavilyKey?: string;
+  keys?: Record<string, string>;
 }
 
 export type SSECallback = (type: 'token' | 'done' | 'error', data: unknown) => void;

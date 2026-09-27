@@ -7,6 +7,7 @@ import {
   DocumentAttachment,
 } from '../types';
 import { AVAILABLE_MODELS, PROVIDERS } from '../constants/models';
+import { getStoredApiKeys } from '../utils/storage';
 
 function createNewSession(provider: ProviderId = 'gemini', modelId?: string): ChatSession {
   const chosenModel = modelId || PROVIDERS[provider].defaultModel;
@@ -38,24 +39,43 @@ export function useChat(
   const setProviderAndModel = useCallback(
     (provider: ProviderId, modelId?: string) => {
       const targetModel = modelId || PROVIDERS[provider].defaultModel;
+      const storedKeys = getStoredApiKeys();
+      const hasTavily = Boolean(storedKeys.tavily && storedKeys.tavily.trim());
+
       setSessions((prev) =>
-        prev.map((s) =>
-          s.id === activeSession.id
-            ? { ...s, provider, modelId: targetModel, updatedAt: Date.now() }
-            : s
-        )
+        prev.map((s) => {
+          if (s.id !== activeSession.id) return s;
+          // If switching to non-Gemini and no Tavily key, auto-disable web search
+          const shouldKeepWebSearch =
+            s.webSearchEnabled && (provider === 'gemini' || hasTavily);
+
+          return {
+            ...s,
+            provider,
+            modelId: targetModel,
+            webSearchEnabled: shouldKeepWebSearch,
+            updatedAt: Date.now(),
+          };
+        })
       );
     },
     [activeSession?.id]
   );
 
   const toggleWebSearch = useCallback(() => {
+    const storedKeys = getStoredApiKeys();
+    const hasTavily = Boolean(storedKeys.tavily && storedKeys.tavily.trim());
+
     setSessions((prev) =>
-      prev.map((s) =>
-        s.id === activeSession.id
-          ? { ...s, webSearchEnabled: !s.webSearchEnabled, updatedAt: Date.now() }
-          : s
-      )
+      prev.map((s) => {
+        if (s.id !== activeSession.id) return s;
+        // If non-Gemini and turning on without Tavily key, prevent toggle
+        const nextEnabled = !s.webSearchEnabled;
+        if (nextEnabled && s.provider !== 'gemini' && !hasTavily) {
+          return { ...s, webSearchEnabled: false, updatedAt: Date.now() };
+        }
+        return { ...s, webSearchEnabled: nextEnabled, updatedAt: Date.now() };
+      })
     );
   }, [activeSession?.id]);
 
@@ -192,7 +212,7 @@ export function useChat(
           : activeSession.webSearchEnabled
           ? currentProvider === 'gemini'
             ? 'gemini_google_search'
-            : 'searxng'
+            : 'tavily'
           : null,
         docGroundingStatus: hasDoc
           ? 'grounded'
@@ -227,6 +247,8 @@ export function useChat(
       let accumulated = '';
       let receivedDone = false;
 
+      const storedKeys = getStoredApiKeys();
+
       try {
         const response = await fetch('/api/chat', {
           method: 'POST',
@@ -239,6 +261,8 @@ export function useChat(
             model: currentModelId,
             messages: messageHistory,
             webSearch: activeSession.webSearchEnabled,
+            tavilyKey: storedKeys.tavily,
+            keys: storedKeys,
             docId: activeSession.documentAttached?.id,
           }),
           signal: controller.signal,
@@ -366,7 +390,15 @@ export function useChat(
                         ...s,
                         messages: s.messages.map((m) =>
                           m.id === assistantMsgId
-                            ? { ...m, webSearchFallback: true, searchStatus: null }
+                            ? {
+                                ...m,
+                                webSearchFallback: true,
+                                webSearchFallbackReason:
+                                  typeof data === 'string' && data
+                                    ? data
+                                    : 'Web search unavailable, answered from model knowledge only',
+                                searchStatus: null,
+                              }
                             : m
                         ),
                       };

@@ -36,9 +36,9 @@ export function saveStoredApiKeys(keys: ApiKeys): void {
 /**
  * Clear a specific provider key from sessionStorage.
  */
-export function clearStoredApiKey(provider: ProviderId): void {
+export function clearStoredApiKey(provider: ProviderId | keyof ApiKeys): void {
   const current = getStoredApiKeys();
-  delete current[provider];
+  delete current[provider as keyof ApiKeys];
   saveStoredApiKeys(current);
 }
 
@@ -76,3 +76,44 @@ export function saveStoredModelAvailability(avail: Record<string, boolean>): voi
     window.sessionStorage.setItem(MODEL_AVAILABILITY_KEY, JSON.stringify(avail));
   } catch {}
 }
+
+const GMAIL_CREDS_KEY = 'omnichat_session_gmail_creds';
+
+export interface StoredGmailCredentials {
+  email: string;
+  appPassword: string;
+}
+
+export function getStoredGmailCredentials(): StoredGmailCredentials | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(GMAIL_CREDS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.email === 'string' && typeof parsed.appPassword === 'string') {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredGmailCredentials(creds: StoredGmailCredentials | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!creds) {
+      window.sessionStorage.removeItem(GMAIL_CREDS_KEY);
+    } else {
+      window.sessionStorage.setItem(GMAIL_CREDS_KEY, JSON.stringify(creds));
+    }
+    window.dispatchEvent(new Event('omnichat:gmail_updated'));
+  } catch (err) {
+    console.error('[OmniChat] Error saving Gmail credentials:', err);
+  }
+}
+
+export function clearStoredGmailCredentials(): void {
+  saveStoredGmailCredentials(null);
+}
+

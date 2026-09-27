@@ -115,7 +115,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         <span>·</span>
         <div className="flex items-center gap-1.5">
           <Globe className="w-3.5 h-3.5 text-blue-400" />
-          <span>SearXNG & Gemini Search</span>
+          <span>Web Search Grounding</span>
         </div>
         <span>·</span>
         <div className="flex items-center gap-1.5">

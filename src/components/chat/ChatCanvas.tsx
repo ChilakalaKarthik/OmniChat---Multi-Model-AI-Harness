@@ -63,7 +63,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
           {session.webSearchEnabled && (
             <span className="ml-1 text-[11px] font-mono text-blue-400 bg-blue-950/50 px-1.5 py-0.5 rounded border border-blue-900/60 hidden sm:inline-flex items-center gap-1">
               <Globe className="w-3 h-3" />
-              <span>{session.provider === 'gemini' ? 'Google Search' : 'SearXNG'}</span>
+              <span>Search</span>
             </span>
           )}
 
@@ -120,8 +120,8 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
         )}
       </div>
 
-      {/* Sticky Bottom Composer */}
-      <div className="shrink-0 bg-gradient-to-t from-neutral-950 via-neutral-950/95 to-transparent pt-3">
+      {/* Pinned Bottom Composer Area */}
+      <div className="shrink-0 border-t border-neutral-850 bg-neutral-950/95 backdrop-blur-md px-4 py-3 sm:px-6">
         <Composer
           onSendMessage={onSendMessage}
           isGenerating={isGenerating}

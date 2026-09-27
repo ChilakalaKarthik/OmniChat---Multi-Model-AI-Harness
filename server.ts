@@ -6,8 +6,10 @@ import { handleChatStream } from './server/chatHandler';
 import { testProviderApiKey } from './server/keyTester';
 import { parseUploadedDocument } from './server/rag/fileParser';
 import { saveDocument, getDocument } from './server/rag/documentStore';
-import { searchSearXNG } from './server/search/searxng';
+import { searchTavily } from './server/search/tavily';
 import { verifyProviderModels } from './server/modelVerifier';
+import { testGmailConnection, fetchInboxMessages, fetchFullMessage } from './server/gmail/imap';
+import { generateEmailDraftReply } from './server/gmail/draftHelper';
 import { ProviderId } from './server/providers/types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -158,18 +160,133 @@ async function startServer() {
     });
   });
 
-  // Phase 4: SearXNG Web Search Proxy Endpoint (Section 5)
+  // Phase 4: Tavily Web Search Proxy Endpoint
+  app.post('/api/search', async (req: Request, res: Response) => {
+    const { query, tavilyKey, apiKey } = req.body || {};
+    const q = String(query || '').trim();
+    const key = String(tavilyKey || apiKey || '').trim();
+
+    if (!q) {
+      return res.status(400).json({ ok: false, error: 'Query parameter is required' });
+    }
+
+    try {
+      const result = await searchTavily(q, key);
+      return res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Search error';
+      return res.status(500).json({ ok: false, error: message });
+    }
+  });
+
   app.get('/api/search', async (req: Request, res: Response) => {
-    const query = String(req.query.q || '').trim();
-    if (!query) {
+    const q = String(req.query.q || req.query.query || '').trim();
+    const key = String(req.query.tavilyKey || req.query.apiKey || '').trim();
+
+    if (!q) {
       return res.status(400).json({ ok: false, error: 'Query parameter "q" is required' });
     }
 
     try {
-      const result = await searchSearXNG(query);
+      const result = await searchTavily(q, key);
       return res.json(result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Search error';
+      return res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  // Part 3: Gmail IMAP Routes (Connect, Fetch Messages, Draft Reply)
+  app.post('/api/gmail/connect', async (req: Request, res: Response) => {
+    const { email, appPassword } = req.body || {};
+    if (!email || !appPassword) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Gmail address and App Password are required.',
+      });
+    }
+
+    const result = await testGmailConnection(email, appPassword);
+    if (!result.ok) {
+      return res.status(401).json(result);
+    }
+    return res.json(result);
+  });
+
+  app.post('/api/gmail/messages', async (req: Request, res: Response) => {
+    const { email, appPassword, limit } = req.body || {};
+    if (!email || !appPassword) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Gmail address and App Password are required.',
+      });
+    }
+
+    const result = await fetchInboxMessages(email, appPassword, Number(limit) || 10);
+    if (!result.ok) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  });
+
+  app.post('/api/gmail/message', async (req: Request, res: Response) => {
+    const { email, appPassword, messageId } = req.body || {};
+    if (!email || !appPassword || !messageId) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Email, App Password, and messageId are required.',
+      });
+    }
+
+    const result = await fetchFullMessage(email, appPassword, String(messageId));
+    if (!result.ok) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  });
+
+  app.post('/api/gmail/draft-reply', async (req: Request, res: Response) => {
+    const { email, appPassword, messageId, promptInstructions, provider, model, apiKey } =
+      req.body || {};
+    if (!email || !appPassword || !messageId) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Email, App Password, and messageId are required.',
+      });
+    }
+
+    try {
+      const msgResult = await fetchFullMessage(email, appPassword, String(messageId));
+      if (!msgResult.ok || !msgResult.message) {
+        return res.status(400).json({
+          ok: false,
+          error: msgResult.error || 'Failed to fetch original message for drafting.',
+        });
+      }
+
+      const draftText = await generateEmailDraftReply({
+        message: msgResult.message,
+        userPrompt: promptInstructions,
+        provider,
+        model,
+        apiKey,
+      });
+
+      return res.json({
+        ok: true,
+        draft: draftText,
+        subject: msgResult.message.subject.startsWith('Re:')
+          ? msgResult.message.subject
+          : `Re: ${msgResult.message.subject}`,
+        originalMessage: {
+          id: msgResult.message.id,
+          subject: msgResult.message.subject,
+          from: msgResult.message.from,
+          date: msgResult.message.date,
+        },
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Draft generation error';
       return res.status(500).json({ ok: false, error: message });
     }
   });

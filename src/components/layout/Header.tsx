@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Globe, ChevronDown } from 'lucide-react';
+import { Sparkles, Globe, ChevronDown, Sun, Moon } from 'lucide-react';
 import { ProviderId, ModelAvailabilityMap } from '../../types';
 import { AVAILABLE_MODELS, PROVIDERS } from '../../constants/models';
 
@@ -8,12 +8,14 @@ interface HeaderProps {
   currentModelId: string;
   onSelectModel: (provider: ProviderId, modelId: string) => void;
   hasKeyForCurrentProvider: boolean;
+  hasTavilyKey?: boolean;
   keyTestFailed?: boolean;
   modelAvailability: ModelAvailabilityMap;
-  onOpenKeysModal: () => void;
-  onNewChat: () => void;
+  onOpenKeysModal: (initialTab?: string) => void;
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
   onToggleSidebar?: () => void;
 }
 
@@ -21,12 +23,14 @@ export const Header: React.FC<HeaderProps> = ({
   currentProvider,
   currentModelId,
   onSelectModel,
+  hasTavilyKey,
   keyTestFailed,
   modelAvailability,
   onOpenKeysModal,
-  onNewChat,
   webSearchEnabled,
   onToggleWebSearch,
+  theme,
+  onToggleTheme,
 }) => {
   const [modelDropdownOpen, setModelDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -58,7 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
             OmniChat
           </span>
         </a>
-        <span className="hidden sm:inline text-neutral-600 text-xs font-mono">v1 · byok harness</span>
       </div>
 
       {/* Zone 2: Navigation & Model Switcher */}
@@ -194,35 +197,50 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Web Search Grounding Quick Toggle */}
-        <button
-          type="button"
-          onClick={onToggleWebSearch}
-          title={
-            webSearchEnabled
-              ? currentProvider === 'gemini'
-                ? 'Web search active via Gemini Google Search grounding'
-                : 'Web search active via SearXNG'
-              : 'Enable web search grounding'
-          }
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            webSearchEnabled
-              ? 'bg-blue-950/40 border-blue-800/80 text-blue-300'
-              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
-          <Globe className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Web Search</span>
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              webSearchEnabled ? 'bg-blue-400 animate-pulse' : 'bg-neutral-600'
-            }`}
-          />
-        </button>
+        {(() => {
+          const isTavilyRequiredAndMissing = currentProvider !== 'gemini' && !hasTavilyKey;
+          const searchTitle = isTavilyRequiredAndMissing
+            ? 'Add a Tavily key to enable web search'
+            : webSearchEnabled
+            ? currentProvider === 'gemini'
+              ? 'Web search active via Gemini Google Search grounding'
+              : 'Web search active via Tavily Search'
+            : 'Enable web search grounding';
+
+          return (
+            <button
+              type="button"
+              onClick={() => {
+                if (isTavilyRequiredAndMissing) {
+                  onOpenKeysModal('tavily');
+                } else {
+                  onToggleWebSearch();
+                }
+              }}
+              title={searchTitle}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                webSearchEnabled
+                  ? 'bg-blue-950/40 border-blue-800/80 text-blue-300'
+                  : isTavilyRequiredAndMissing
+                  ? 'bg-neutral-900/50 border-neutral-850 text-neutral-500 hover:text-neutral-300'
+                  : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Web Search</span>
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  webSearchEnabled ? 'bg-blue-400 animate-pulse' : 'bg-neutral-600'
+                }`}
+              />
+            </button>
+          );
+        })()}
 
         {/* API Key Modal Button */}
         <button
           type="button"
-          onClick={onOpenKeysModal}
+          onClick={() => onOpenKeysModal()}
           title="Open API Key Manager"
           className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-neutral-300 hover:text-neutral-100 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
         >
@@ -231,14 +249,25 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Zone 3: New Conversation Button */}
+      {/* Zone 3: Dark / Light Mode Toggle Button */}
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={onNewChat}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neutral-950 bg-neutral-100 hover:bg-white rounded-lg transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-300 hover:text-neutral-100 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 rounded-lg transition-colors cursor-pointer shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
         >
-          <span>New Chat</span>
+          {theme === 'dark' ? (
+            <>
+              <Sun className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Light</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Dark</span>
+            </>
+          )}
         </button>
       </div>
     </header>

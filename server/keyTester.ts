@@ -148,6 +148,39 @@ export async function testProviderApiKey(
         return { ok: false, provider, reason };
       }
 
+      case 'tavily' as any: {
+        const res = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            api_key: trimmedKey,
+            query: 'test ping',
+            max_results: 1,
+          }),
+          signal: controller.signal,
+        });
+
+        if (res.ok) {
+          return {
+            ok: true,
+            provider,
+            message: 'Tavily API key verified and operational.',
+          };
+        }
+
+        const data = await res.json().catch(() => ({}));
+        const reason =
+          (res.status === 401 || res.status === 403
+            ? 'Invalid Tavily key'
+            : res.status === 429 || res.status === 402
+            ? 'Tavily search quota reached (429/402).'
+            : data?.detail?.error || data?.error || data?.message || `Tavily returned status ${res.status}`);
+
+        return { ok: false, provider, reason };
+      }
+
       default:
         return {
           ok: false,

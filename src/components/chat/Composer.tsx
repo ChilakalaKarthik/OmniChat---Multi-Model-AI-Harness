@@ -75,7 +75,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const canSend = input.trim().length > 0 && hasKeyForSelectedModel && !isGenerating;
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 pb-4">
+    <div className="w-full max-w-3xl mx-auto">
       {/* Missing Key Warning Banner (Required by Section 7) */}
       {!hasKeyForSelectedModel && (
         <div className="mb-2.5 px-3.5 py-2.5 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-300 text-xs flex items-center justify-between shadow-lg backdrop-blur-sm animate-in fade-in duration-150">
@@ -154,24 +154,23 @@ export const Composer: React.FC<ComposerProps> = ({
               title={
                 webSearchEnabled
                   ? currentProvider === 'gemini'
-                    ? 'Using Gemini built-in search grounding'
-                    : 'Using SearXNG metasearch'
-                  : 'Enable Web Search'
+                    ? 'Web search enabled via Gemini Google Search grounding'
+                    : 'Web search enabled via Tavily Search'
+                  : 'Enable Web Search Grounding'
               }
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                 webSearchEnabled
-                  ? 'bg-blue-950/60 border-blue-700/80 text-blue-300'
+                  ? 'bg-blue-950/60 border-blue-700/80 text-blue-300 shadow-sm'
                   : 'bg-neutral-850/60 border-neutral-800 text-neutral-400 hover:text-neutral-200'
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
-              <span className="text-[11px]">
-                {webSearchEnabled
-                  ? currentProvider === 'gemini'
-                    ? 'Gemini search'
-                    : 'SearXNG'
-                  : 'Search'}
-              </span>
+              <span className="text-[11px] font-medium">Search</span>
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  webSearchEnabled ? 'bg-blue-400 animate-pulse' : 'bg-neutral-600'
+                }`}
+              />
             </button>
 
             {/* Document RAG upload trigger (Phase 3) */}

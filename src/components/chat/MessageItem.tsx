@@ -248,11 +248,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               </div>
             )}
 
-            {/* Web Search Degradation Banner (Section 7 requirement) */}
+            {/* Web Search Degradation Banner */}
             {message.webSearchFallback && (
               <div className="mt-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-400 font-mono flex items-center gap-2">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Web search unavailable, answered from model knowledge only</span>
+                <span>
+                  {message.webSearchFallbackReason ||
+                    'Web search unavailable, answered from model knowledge only'}
+                </span>
               </div>
             )}
 

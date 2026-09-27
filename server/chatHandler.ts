@@ -5,7 +5,7 @@ import { streamAnthropic } from './providers/anthropic';
 import { streamGemini } from './providers/gemini';
 import { streamXAI } from './providers/xai';
 import { getDocument, findTopChunks } from './rag/documentStore';
-import { searchSearXNG } from './search/searxng';
+import { searchTavily } from './search/tavily';
 
 export async function handleChatStream(req: Request, res: Response): Promise<void> {
   // Set SSE Headers
@@ -41,6 +41,8 @@ export async function handleChatStream(req: Request, res: Response): Promise<voi
     contextChunks,
     docId,
     webSearch,
+    tavilyKey,
+    keys,
   } = (req.body || {}) as ChatRequestBody;
 
   // Validate inputs
@@ -49,6 +51,8 @@ export async function handleChatStream(req: Request, res: Response): Promise<voi
     res.end();
     return;
   }
+
+  const effectiveTavilyKey = (tavilyKey || keys?.tavily || '').trim();
 
   const trimmedKey = String(apiKey).trim();
   if (!trimmedKey) {
@@ -88,44 +92,54 @@ export async function handleChatStream(req: Request, res: Response): Promise<voi
     });
   }
 
-  // Phase 4: Web Search Grounding for Non-Gemini Models via SearXNG Proxy (Section 2, 3, 5, 7)
+  // Phase 4: Web Search Grounding for Non-Gemini Models via Tavily API
   if (webSearch && provider !== 'gemini') {
     const latestUserQuery =
       normalizedMessages.filter((m) => m.role === 'user').slice(-1)[0]?.content || '';
     if (latestUserQuery) {
-      try {
-        sendSSE('web_search_status', 'Waking up search service…');
-        const searchResult = await searchSearXNG(latestUserQuery, (status) => {
-          sendSSE('web_search_status', status);
-        });
-        if (searchResult.ok && searchResult.results.length > 0) {
-          const searchContext = `[Web Search Grounding Results for query: "${latestUserQuery}"]\n\n${searchResult.results
-            .map(
-              (r, i) =>
-                `--- Source ${i + 1}: ${r.title} ---\nURL: ${r.url}\nSummary: ${r.snippet}`
-            )
-            .join(
-              '\n\n'
-            )}\n\n[Instructions: Provide an accurate answer synthesizing these search results, citing the source URLs.]`;
+      if (!effectiveTavilyKey) {
+        sendSSE(
+          'web_search_fallback',
+          'Add a Tavily key to enable web search'
+        );
+      } else {
+        try {
+          const searchResult = await searchTavily(latestUserQuery, effectiveTavilyKey);
+          if (searchResult.ok && searchResult.results.length > 0) {
+            const searchContext = `[Web Search Grounding Results for query: "${latestUserQuery}"]\n\n${searchResult.results
+              .map(
+                (r, i) =>
+                  `--- Source ${i + 1}: ${r.title} ---\nURL: ${r.url}\nSummary: ${r.snippet}`
+              )
+              .join(
+                '\n\n'
+              )}\n\n[Instructions: Provide an accurate answer synthesizing these search results, citing the source URLs.]`;
 
-          normalizedMessages.unshift({
-            role: 'system',
-            content: searchContext,
-          });
+            normalizedMessages.unshift({
+              role: 'system',
+              content: searchContext,
+            });
 
-          sendSSE('web_search_sources', searchResult.results);
-        } else {
-          // Fallback notice (Section 7 constraint)
+            sendSSE('web_search_sources', searchResult.results);
+          } else if (searchResult.quotaExceeded) {
+            // Quota reached: answer from model knowledge with specific banner
+            sendSSE(
+              'web_search_fallback',
+              'Web search quota reached this month'
+            );
+          } else {
+            // Timeout or error: answer from model knowledge with standard fallback banner
+            sendSSE(
+              'web_search_fallback',
+              searchResult.error || 'Web search unavailable, answered from model knowledge only'
+            );
+          }
+        } catch {
           sendSSE(
             'web_search_fallback',
             'Web search unavailable, answered from model knowledge only'
           );
         }
-      } catch {
-        sendSSE(
-          'web_search_fallback',
-          'Web search unavailable, answered from model knowledge only'
-        );
       }
     }
   }
