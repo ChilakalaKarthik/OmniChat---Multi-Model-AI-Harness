@@ -16,9 +16,10 @@ export interface ApiKeys {
   gemini?: string;
   xai?: string;
   tavily?: string;
+  gmail?: string;
 }
 
-export type KeyTabId = ProviderId | 'tavily';
+export type KeyTabId = ProviderId | 'tavily' | 'gmail';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
@@ -68,8 +69,8 @@ export interface ChatSession {
   title: string;
   createdAt: number;
   updatedAt: number;
-  provider: ProviderId;
-  modelId: string;
+  provider: ProviderId | null;
+  modelId: string | null;
   messages: ChatMessage[];
   webSearchEnabled: boolean;
   documentAttached?: DocumentAttachment;

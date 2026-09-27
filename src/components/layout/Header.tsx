@@ -4,8 +4,8 @@ import { ProviderId, ModelAvailabilityMap } from '../../types';
 import { AVAILABLE_MODELS, PROVIDERS } from '../../constants/models';
 
 interface HeaderProps {
-  currentProvider: ProviderId;
-  currentModelId: string;
+  currentProvider: ProviderId | null;
+  currentModelId: string | null;
   onSelectModel: (provider: ProviderId, modelId: string) => void;
   hasKeyForCurrentProvider: boolean;
   hasTavilyKey?: boolean;
@@ -35,9 +35,9 @@ export const Header: React.FC<HeaderProps> = ({
   const [modelDropdownOpen, setModelDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const providerMeta = PROVIDERS[currentProvider];
-  const modelMeta = AVAILABLE_MODELS.find((m) => m.id === currentModelId);
-  const currentModelUnavailable = modelAvailability[currentModelId] === false;
+  const providerMeta = currentProvider ? PROVIDERS[currentProvider] : null;
+  const modelMeta = currentModelId ? AVAILABLE_MODELS.find((m) => m.id === currentModelId) : null;
+  const currentModelUnavailable = currentModelId ? modelAvailability[currentModelId] === false : false;
 
   // Close dropdown on outside click
   React.useEffect(() => {
@@ -71,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => setModelDropdownOpen((prev) => !prev)}
-            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-neutral-900 hover:bg-neutral-850 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 ${
+            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-neutral-900 hover:bg-neutral-850 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 cursor-pointer ${
               currentModelUnavailable
                 ? 'border border-red-500/80 text-red-200'
                 : keyTestFailed
@@ -89,18 +89,26 @@ export const Header: React.FC<HeaderProps> = ({
                 className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"
                 title="API key verification failed"
               />
-            ) : (
+            ) : providerMeta ? (
               <span
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: providerMeta.accentColor }}
               />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-neutral-500 shrink-0" />
             )}
-            <span className="text-neutral-400 font-mono hidden md:inline">
-              {providerMeta.shortName}
-            </span>
-            <span className="text-neutral-200 font-medium">
-              {modelMeta?.name || currentModelId}
-            </span>
+            {providerMeta ? (
+              <>
+                <span className="text-neutral-400 font-mono hidden md:inline">
+                  {providerMeta.shortName}
+                </span>
+                <span className="text-neutral-200 font-medium">
+                  {modelMeta?.name || currentModelId}
+                </span>
+              </>
+            ) : (
+              <span className="text-neutral-400 font-medium">Select Model</span>
+            )}
 
             {/* Warning tag on closed button if unavailable */}
             {currentModelUnavailable && (

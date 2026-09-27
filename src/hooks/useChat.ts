@@ -9,8 +9,8 @@ import {
 import { AVAILABLE_MODELS, PROVIDERS } from '../constants/models';
 import { getStoredApiKeys } from '../utils/storage';
 
-function createNewSession(provider: ProviderId = 'gemini', modelId?: string): ChatSession {
-  const chosenModel = modelId || PROVIDERS[provider].defaultModel;
+function createNewSession(provider: ProviderId | null = null, modelId?: string | null): ChatSession {
+  const chosenModel = provider ? (modelId || PROVIDERS[provider].defaultModel) : null;
   return {
     id: 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
     title: 'New Conversation',
@@ -27,7 +27,7 @@ export function useChat(
   hasKeyForProvider: (provider: ProviderId) => boolean,
   getKeyForProvider: (provider: ProviderId) => string | undefined
 ) {
-  const [sessions, setSessions] = useState<ChatSession[]>(() => [createNewSession()]);
+  const [sessions, setSessions] = useState<ChatSession[]>(() => [createNewSession(null, null)]);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || '');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -37,8 +37,8 @@ export function useChat(
   const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
   const setProviderAndModel = useCallback(
-    (provider: ProviderId, modelId?: string) => {
-      const targetModel = modelId || PROVIDERS[provider].defaultModel;
+    (provider: ProviderId | null, modelId?: string | null) => {
+      const targetModel = provider ? (modelId || PROVIDERS[provider].defaultModel) : null;
       const storedKeys = getStoredApiKeys();
       const hasTavily = Boolean(storedKeys.tavily && storedKeys.tavily.trim());
 
@@ -47,13 +47,13 @@ export function useChat(
           if (s.id !== activeSession.id) return s;
           // If switching to non-Gemini and no Tavily key, auto-disable web search
           const shouldKeepWebSearch =
-            s.webSearchEnabled && (provider === 'gemini' || hasTavily);
+            s.webSearchEnabled && provider && (provider === 'gemini' || hasTavily);
 
           return {
             ...s,
             provider,
             modelId: targetModel,
-            webSearchEnabled: shouldKeepWebSearch,
+            webSearchEnabled: Boolean(shouldKeepWebSearch),
             updatedAt: Date.now(),
           };
         })
@@ -103,11 +103,10 @@ export function useChat(
   }, [activeSession?.id]);
 
   const startNewSession = useCallback(
-    (provider?: ProviderId, modelId?: string) => {
-      const newSess = createNewSession(
-        provider || activeSession?.provider || 'gemini',
-        modelId || activeSession?.modelId
-      );
+    (provider?: ProviderId | null, modelId?: string | null) => {
+      const targetProvider = provider !== undefined ? provider : activeSession?.provider || null;
+      const targetModel = modelId !== undefined ? modelId : activeSession?.modelId || null;
+      const newSess = createNewSession(targetProvider, targetModel);
       setSessions((prev) => [newSess, ...prev]);
       setActiveSessionId(newSess.id);
       return newSess.id;
@@ -120,7 +119,7 @@ export function useChat(
       setSessions((prev) => {
         const filtered = prev.filter((s) => s.id !== sessionId);
         if (filtered.length === 0) {
-          const fresh = createNewSession();
+          const fresh = createNewSession(null, null);
           setActiveSessionId(fresh.id);
           return [fresh];
         }
@@ -172,8 +171,11 @@ export function useChat(
 
       const currentProvider = activeSession.provider;
       const currentModelId = activeSession.modelId;
-      const apiKey = getKeyForProvider(currentProvider);
+      if (!currentProvider || !currentModelId) {
+        return;
+      }
 
+      const apiKey = getKeyForProvider(currentProvider);
       if (!apiKey || !apiKey.trim()) {
         return;
       }

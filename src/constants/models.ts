@@ -82,6 +82,19 @@ export const TAVILY_META = {
   badgeText: 'text-cyan-400',
 };
 
+export const GMAIL_META = {
+  id: 'gmail' as const,
+  name: 'Gmail Assistant',
+  shortName: 'Gmail',
+  tagline: 'Direct IMAP TLS · 16-character App Password · Smart Reply Assistant',
+  keyPrefix: '',
+  keyHelpUrl: 'https://myaccount.google.com/apppasswords',
+  placeholder: 'abcd efgh ijkl mnop',
+  accentColor: '#f43f5e',
+  badgeBg: 'bg-rose-950/60',
+  badgeText: 'text-rose-400',
+};
+
 export const AVAILABLE_MODELS: ModelOption[] = [
   // OpenAI
   {

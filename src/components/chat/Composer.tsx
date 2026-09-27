@@ -17,8 +17,8 @@ interface ComposerProps {
   isGenerating: boolean;
   onStop: () => void;
   hasKeyForSelectedModel: boolean;
-  currentProvider: ProviderId;
-  currentModelId: string;
+  currentProvider: ProviderId | null;
+  currentModelId: string | null;
   onOpenKeysModal: () => void;
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
@@ -44,8 +44,8 @@ export const Composer: React.FC<ComposerProps> = ({
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const providerMeta = PROVIDERS[currentProvider];
-  const modelMeta = AVAILABLE_MODELS.find((m) => m.id === currentModelId);
+  const providerMeta = currentProvider ? PROVIDERS[currentProvider] : null;
+  const modelMeta = currentModelId ? AVAILABLE_MODELS.find((m) => m.id === currentModelId) : null;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -64,7 +64,7 @@ export const Composer: React.FC<ComposerProps> = ({
   };
 
   const handleSubmit = () => {
-    if (!input.trim() || isGenerating || !hasKeyForSelectedModel) return;
+    if (!input.trim() || isGenerating || !currentProvider || !hasKeyForSelectedModel) return;
     onSendMessage(input);
     setInput('');
     if (textareaRef.current) {
@@ -72,12 +72,12 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  const canSend = input.trim().length > 0 && hasKeyForSelectedModel && !isGenerating;
+  const canSend = input.trim().length > 0 && Boolean(currentProvider) && hasKeyForSelectedModel && !isGenerating;
 
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Missing Key Warning Banner (Required by Section 7) */}
-      {!hasKeyForSelectedModel && (
+      {currentProvider && !hasKeyForSelectedModel && providerMeta && (
         <div className="mb-2.5 px-3.5 py-2.5 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-300 text-xs flex items-center justify-between shadow-lg backdrop-blur-sm animate-in fade-in duration-150">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
@@ -89,7 +89,7 @@ export const Composer: React.FC<ComposerProps> = ({
           <button
             type="button"
             onClick={onOpenKeysModal}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg font-semibold text-xs transition-colors shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg font-semibold text-xs transition-colors shrink-0 cursor-pointer"
           >
             <Key className="w-3.5 h-3.5" />
             <span>Add Key</span>
@@ -100,8 +100,8 @@ export const Composer: React.FC<ComposerProps> = ({
       {/* Main Composer Box */}
       <div
         className={`relative rounded-2xl bg-neutral-900 border transition-all ${
-          !hasKeyForSelectedModel
-            ? 'border-neutral-800 opacity-80'
+          !currentProvider || !hasKeyForSelectedModel
+            ? 'border-neutral-800 opacity-85'
             : 'border-neutral-800 focus-within:border-neutral-700 focus-within:ring-1 focus-within:ring-neutral-700 shadow-xl'
         }`}
       >
@@ -131,16 +131,18 @@ export const Composer: React.FC<ComposerProps> = ({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={!hasKeyForSelectedModel}
+          disabled={!currentProvider || !hasKeyForSelectedModel}
           rows={1}
           placeholder={
-            hasKeyForSelectedModel
+            !currentProvider
+              ? 'Select a model provider above to start chatting...'
+              : hasKeyForSelectedModel
               ? attachedDoc
                 ? `Ask questions grounded in ${attachedDoc.filename}...`
                 : `Message ${modelMeta?.name || 'model'}... (Shift+Enter for new line)`
-              : `API key required for ${providerMeta.name}...`
+              : `API key required for ${providerMeta?.name}...`
           }
-          className="w-full bg-transparent px-4 pt-3 pb-2 text-sm text-neutral-100 placeholder:text-neutral-500 resize-none focus:outline-none max-h-48 font-sans"
+          className="w-full bg-transparent px-4 pt-3 pb-2 text-sm text-neutral-100 placeholder:text-neutral-500 resize-none focus:outline-none max-h-48 font-sans disabled:cursor-not-allowed"
         />
 
         {/* Toolbar & Actions */}
@@ -151,6 +153,7 @@ export const Composer: React.FC<ComposerProps> = ({
             <button
               type="button"
               onClick={onToggleWebSearch}
+              disabled={!currentProvider}
               title={
                 webSearchEnabled
                   ? currentProvider === 'gemini'
@@ -158,10 +161,12 @@ export const Composer: React.FC<ComposerProps> = ({
                     : 'Web search enabled via Tavily Search'
                   : 'Enable Web Search Grounding'
               }
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                webSearchEnabled
-                  ? 'bg-blue-950/60 border-blue-700/80 text-blue-300 shadow-sm'
-                  : 'bg-neutral-850/60 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                !currentProvider
+                  ? 'bg-neutral-850/30 border-neutral-850 text-neutral-600 cursor-not-allowed'
+                  : webSearchEnabled
+                  ? 'bg-blue-950/60 border-blue-700/80 text-blue-300 shadow-sm cursor-pointer'
+                  : 'bg-neutral-850/60 border-neutral-800 text-neutral-400 hover:text-neutral-200 cursor-pointer'
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
@@ -182,7 +187,7 @@ export const Composer: React.FC<ComposerProps> = ({
                   ? `Active document: ${attachedDoc.filename}. Click to replace or remove.`
                   : 'Attach Document for RAG (PDF, DOCX, TXT)'
               }
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border transition-colors cursor-pointer ${
                 attachedDoc
                   ? 'bg-emerald-950/50 border-emerald-800/80 text-emerald-300'
                   : 'bg-neutral-850/40 border-neutral-800 text-neutral-400 hover:text-neutral-200'
@@ -201,7 +206,7 @@ export const Composer: React.FC<ComposerProps> = ({
               <button
                 type="button"
                 onClick={onStop}
-                className="flex items-center gap-1 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 rounded-xl text-xs font-medium transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 rounded-xl text-xs font-medium transition-colors cursor-pointer"
                 title="Stop response generation"
               >
                 <Square className="w-3 h-3 fill-current text-red-400" />
@@ -218,8 +223,10 @@ export const Composer: React.FC<ComposerProps> = ({
                     : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                 }`}
                 title={
-                  !hasKeyForSelectedModel
-                    ? `Please configure an API key for ${providerMeta.name}`
+                  !currentProvider
+                    ? 'Please select a provider first'
+                    : !hasKeyForSelectedModel
+                    ? `Please configure an API key for ${providerMeta?.name}`
                     : 'Send message'
                 }
               >

@@ -100,11 +100,11 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const currentProvider = activeSession?.provider || 'gemini';
-  const currentModelId = activeSession?.modelId || 'gemini-3.8-flash';
-  const hasKeyForSelected = hasKey(currentProvider);
+  const currentProvider = activeSession?.provider || null;
+  const currentModelId = activeSession?.modelId || null;
+  const hasKeyForSelected = currentProvider ? hasKey(currentProvider) : false;
   const hasTavilyKey = Boolean(keys.tavily && keys.tavily.trim());
-  const keyTestFailed = testResults[currentProvider]?.ok === false;
+  const keyTestFailed = currentProvider ? testResults[currentProvider]?.ok === false : false;
 
   // Intercept testKey to trigger toast on failure as specified in Section 7 & Part 2
   const handleTestKeyWithToast = async (
@@ -115,6 +115,8 @@ export default function App() {
     const providerName =
       provider === 'tavily'
         ? 'Tavily'
+        : provider === 'gmail'
+        ? 'Gmail'
         : PROVIDERS[provider as ProviderId]?.name || provider;
     if (!result.ok) {
       if (provider === 'tavily') {
@@ -123,7 +125,7 @@ export default function App() {
         addToast('error', `Invalid key for ${providerName}`);
       }
     } else {
-      addToast('success', `${providerName} key validated successfully`);
+      addToast('success', `${providerName} validated successfully`);
     }
     return result;
   };
@@ -146,11 +148,11 @@ export default function App() {
     return result;
   };
 
-  const handleOpenKeysForProvider = (provider?: KeyTabId) => {
+  const handleOpenKeysForProvider = (provider?: KeyTabId | null) => {
     if (provider) {
       setKeysModalInitialProvider(provider);
     } else {
-      setKeysModalInitialProvider(currentProvider);
+      setKeysModalInitialProvider('gemini');
     }
     setIsKeysModalOpen(true);
   };
@@ -166,7 +168,7 @@ export default function App() {
         hasTavilyKey={hasTavilyKey}
         keyTestFailed={keyTestFailed}
         modelAvailability={modelAvailability}
-        onOpenKeysModal={(tab) => handleOpenKeysForProvider((tab as KeyTabId) || currentProvider)}
+        onOpenKeysModal={(tab) => handleOpenKeysForProvider((tab as KeyTabId) || currentProvider || 'gemini')}
         webSearchEnabled={activeSession?.webSearchEnabled || false}
         onToggleWebSearch={toggleWebSearch}
         theme={theme}
@@ -199,14 +201,14 @@ export default function App() {
             sessions={sessions}
             activeSessionId={activeSessionId}
             onSelectSession={setActiveSessionId}
-            onNewSession={() => startNewSession(currentProvider, currentModelId)}
+            onNewSession={() => startNewSession(null, null)}
             onDeleteSession={deleteSession}
             hasKey={hasKey}
             hasTavilyKey={hasTavilyKey}
             hasGmailConnected={hasGmailConnected}
             webSearchEnabled={activeSession?.webSearchEnabled || false}
             onToggleWebSearch={toggleWebSearch}
-            onOpenKeysModal={(tab) => handleOpenKeysForProvider((tab as KeyTabId) || currentProvider)}
+            onOpenKeysModal={(tab) => handleOpenKeysForProvider((tab as KeyTabId) || currentProvider || 'gemini')}
             currentProvider={currentProvider}
             onSelectProvider={(pId) => setProviderAndModel(pId)}
             onOpenToolPreview={() => {}}
@@ -225,11 +227,12 @@ export default function App() {
             isGenerating={isGenerating}
             onStop={stopGeneration}
             onClearSession={clearCurrentSessionMessages}
-            onOpenKeysModal={() => handleOpenKeysForProvider(currentProvider)}
+            onOpenKeysModal={() => handleOpenKeysForProvider(currentProvider || 'gemini')}
             onToggleWebSearch={toggleWebSearch}
             onOpenDocModal={() => setIsDocModalOpen(true)}
             onRemoveDoc={removeDocument}
             onRetryMessage={retryLastMessage}
+            onSelectProvider={(pId) => setProviderAndModel(pId)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-neutral-500 text-xs">
@@ -238,7 +241,7 @@ export default function App() {
         )}
       </div>
 
-      {/* API Key Modal with Model Verification */}
+      {/* API Key Modal with Model Verification & Services */}
       <ApiKeyModal
         isOpen={isKeysModalOpen}
         onClose={() => setIsKeysModalOpen(false)}
@@ -253,6 +256,7 @@ export default function App() {
         modelAvailability={modelAvailability}
         verifyingProvider={verifyingProvider}
         initialProvider={keysModalInitialProvider}
+        onOpenGmailAssistant={() => setIsGmailModalOpen(true)}
       />
 
       {/* Phase 3: Document RAG Upload & Management Modal */}
@@ -272,8 +276,8 @@ export default function App() {
       <GmailModal
         isOpen={isGmailModalOpen}
         onClose={() => setIsGmailModalOpen(false)}
-        currentProvider={currentProvider}
-        currentModelId={currentModelId}
+        currentProvider={currentProvider || 'gemini'}
+        currentModelId={currentModelId || 'gemini-3.8-flash'}
         keys={keys}
         onInsertToChat={(text) => {
           sendMessage(text);

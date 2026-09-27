@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Trash2, FileText, Globe } from 'lucide-react';
-import { ChatSession } from '../../types';
+import { ChatSession, ProviderId } from '../../types';
 import { MessageItem } from './MessageItem';
 import { Composer } from './Composer';
 import { EmptyState } from './EmptyState';
@@ -18,6 +18,7 @@ interface ChatCanvasProps {
   onOpenDocModal: () => void;
   onRemoveDoc: () => void;
   onRetryMessage?: (messageId: string) => void;
+  onSelectProvider?: (provider: ProviderId) => void;
 }
 
 export const ChatCanvas: React.FC<ChatCanvasProps> = ({
@@ -32,10 +33,11 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
   onOpenDocModal,
   onRemoveDoc,
   onRetryMessage,
+  onSelectProvider,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const providerMeta = PROVIDERS[session.provider];
-  const modelMeta = AVAILABLE_MODELS.find((m) => m.id === session.modelId);
+  const providerMeta = session.provider ? PROVIDERS[session.provider] : null;
+  const modelMeta = session.modelId ? AVAILABLE_MODELS.find((m) => m.id === session.modelId) : null;
 
   // Auto-scroll to bottom on message or stream change
   useEffect(() => {
@@ -49,15 +51,24 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
       {/* Subheader / Context Bar */}
       <div className="h-10 px-4 sm:px-6 border-b border-neutral-850 flex items-center justify-between text-xs text-neutral-400 bg-neutral-950/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2 truncate">
-          <span
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: providerMeta.accentColor }}
-          />
-          <span className="font-semibold text-neutral-200">{providerMeta.name}</span>
-          <span className="text-neutral-600">/</span>
-          <span className="font-mono text-neutral-300 truncate">
-            {modelMeta?.name || session.modelId}
-          </span>
+          {providerMeta ? (
+            <>
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: providerMeta.accentColor }}
+              />
+              <span className="font-semibold text-neutral-200">{providerMeta.name}</span>
+              <span className="text-neutral-600">/</span>
+              <span className="font-mono text-neutral-300 truncate">
+                {modelMeta?.name || session.modelId}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 rounded-full bg-neutral-600 shrink-0" />
+              <span className="text-neutral-400 italic">No model provider selected</span>
+            </>
+          )}
 
           {/* Web Search Chip */}
           {session.webSearchEnabled && (
@@ -87,7 +98,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             type="button"
             onClick={onClearSession}
             title="Clear messages in this conversation"
-            className="flex items-center gap-1 text-neutral-500 hover:text-neutral-300 text-[11px] font-medium transition-colors"
+            className="flex items-center gap-1 text-neutral-500 hover:text-neutral-300 text-[11px] font-medium transition-colors cursor-pointer"
           >
             <Trash2 className="w-3 h-3" />
             <span className="hidden sm:inline">Clear Chat</span>
@@ -104,6 +115,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             hasKey={hasKeyForSelectedModel}
             onOpenKeysModal={onOpenKeysModal}
             onSelectPrompt={onSendMessage}
+            onSelectProvider={onSelectProvider}
           />
         ) : (
           <div className="py-4 space-y-1">
