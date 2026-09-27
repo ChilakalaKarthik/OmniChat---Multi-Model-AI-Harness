@@ -1,0 +1,6 @@
+{
+  "name": "OmniChat — Multi-Model AI Harness",
+  "description": "Multi-model AI harness for OpenAI, Anthropic, Gemini, and xAI with ephemeral browser sessions, document grounding, and web search.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
