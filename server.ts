@@ -300,7 +300,8 @@ async function startServer() {
   // Setup static serving or Vite middleware
   const distPath = path.resolve(__dirname, 'dist');
   const hasBuiltDist = fs.existsSync(distPath);
-  const isProduction = hasBuiltDist || process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+  const isDevScript = process.env.NODE_ENV === 'development' || (process.argv[1] && process.argv[1].endsWith('server.ts'));
+  const isProduction = !isDevScript && (process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER) || hasBuiltDist);
 
   if (isProduction && hasBuiltDist) {
     console.log('[OmniChat] Serving production static assets from:', distPath);

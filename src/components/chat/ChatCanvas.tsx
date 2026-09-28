@@ -118,7 +118,7 @@ export const ChatCanvas: React.FC<ChatCanvasProps> = ({
             onSelectProvider={onSelectProvider}
           />
         ) : (
-          <div className="py-4 space-y-1">
+          <div className="py-4 space-y-2">
             {session.messages.map((message) => (
               <MessageItem
                 key={message.id}

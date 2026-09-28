@@ -17,6 +17,75 @@ export interface SearchResponse {
  * Searches the web via Tavily Search API with a 10s timeout.
  * Returns up to 5 grounded search results.
  */
+async function searchPublicFallback(query: string): Promise<SearchResponse> {
+  try {
+    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const results: SearchResultItem[] = [];
+      const resultBlocks = html.split(/class="result\s+results_links/g).slice(1);
+
+      for (const block of resultBlocks) {
+        if (results.length >= 5) break;
+        const titleMatch = block.match(/class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+        const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i) || block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/div>/i);
+
+        if (titleMatch) {
+          let rawUrl = titleMatch[1];
+          if (rawUrl.includes('uddg=')) {
+            const urlParam = rawUrl.split('uddg=')[1]?.split('&')[0];
+            if (urlParam) rawUrl = decodeURIComponent(urlParam);
+          }
+          const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
+          const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, '').trim() : title;
+
+          if (title && rawUrl.startsWith('http')) {
+            results.push({ title, url: rawUrl, snippet });
+          }
+        }
+      }
+
+      if (results.length > 0) {
+        return { ok: true, query, results };
+      }
+    }
+  } catch (err) {
+    console.warn('[PublicSearch] DuckDuckGo fallback error:', err);
+  }
+
+  // Wikipedia fallback
+  try {
+    const wikiRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`);
+    if (wikiRes.ok) {
+      const wikiData = await wikiRes.json();
+      if (wikiData?.query?.search && Array.isArray(wikiData.query.search)) {
+        const wikiResults: SearchResultItem[] = wikiData.query.search.slice(0, 5).map((item: any) => ({
+          title: item.title,
+          url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
+          snippet: item.snippet.replace(/<[^>]+>/g, '').trim(),
+        }));
+        if (wikiResults.length > 0) {
+          return { ok: true, query, results: wikiResults };
+        }
+      }
+    }
+  } catch (wikiErr) {
+    console.warn('[PublicSearch] Wikipedia fallback error:', wikiErr);
+  }
+
+  return {
+    ok: false,
+    query,
+    results: [],
+    fallback: true,
+    error: 'No search results found for this query',
+  };
+}
+
 export async function searchTavily(query: string, apiKey: string): Promise<SearchResponse> {
   const trimmedQuery = query.trim();
   const trimmedKey = (apiKey || '').trim();
@@ -26,13 +95,7 @@ export async function searchTavily(query: string, apiKey: string): Promise<Searc
   }
 
   if (!trimmedKey) {
-    return {
-      ok: false,
-      query: trimmedQuery,
-      results: [],
-      fallback: true,
-      error: 'Add a Tavily key to enable web search',
-    };
+    return searchPublicFallback(trimmedQuery);
   }
 
   const controller = new AbortController();

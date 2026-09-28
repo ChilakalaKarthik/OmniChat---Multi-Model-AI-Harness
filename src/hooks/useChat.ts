@@ -163,7 +163,7 @@ export function useChat(
     }
   }, [activeSession]);
 
-  // Real Chat Streaming via /api/chat with full Section 7 error handling
+  // Real Chat Streaming via /api/chat with full Section 7 error handling & Direct Web Search fallback
   const sendMessage = useCallback(
     async (userInput: string) => {
       if (!userInput.trim() || isGenerating) return;
@@ -171,14 +171,8 @@ export function useChat(
 
       const currentProvider = activeSession.provider;
       const currentModelId = activeSession.modelId;
-      if (!currentProvider || !currentModelId) {
-        return;
-      }
-
-      const apiKey = getKeyForProvider(currentProvider);
-      if (!apiKey || !apiKey.trim()) {
-        return;
-      }
+      const apiKey = currentProvider ? getKeyForProvider(currentProvider) : undefined;
+      const hasLLM = Boolean(currentProvider && currentModelId && apiKey && apiKey.trim());
 
       userAbortedRef.current = false;
       const controller = new AbortController();
@@ -197,6 +191,134 @@ export function useChat(
         : activeSession.title;
 
       const assistantMsgId = 'msg_' + (Date.now() + 1) + '_assistant';
+      const storedKeys = getStoredApiKeys();
+
+      // Handle Direct Web Search mode (no LLM selected or configured)
+      if (!hasLLM) {
+        const searchAssistantMsg: ChatMessage = {
+          id: assistantMsgId,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now() + 1,
+          modelUsed: 'Web Search',
+          providerUsed: undefined,
+          groundingUsed: 'searxng',
+          searchStatus: 'Searching the web for live results…',
+          isStreaming: true,
+        };
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === activeSession.id
+              ? {
+                  ...s,
+                  title: updatedTitle,
+                  messages: [...s.messages, userMsg, searchAssistantMsg],
+                  updatedAt: Date.now(),
+                }
+              : s
+          )
+        );
+
+        setIsGenerating(true);
+
+        try {
+          const res = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: userInput.trim(),
+              tavilyKey: storedKeys.tavily,
+            }),
+            signal: controller.signal,
+          });
+
+          const data = await res.json().catch(() => ({ ok: false }));
+
+          if (data.ok && Array.isArray(data.results) && data.results.length > 0) {
+            const resultsFormatted =
+              `### Web Search Results for "${userInput.trim()}"\n\n` +
+              data.results
+                .map(
+                  (item: any, idx: number) =>
+                    `**${idx + 1}. [${item.title}](${item.url})**\n${item.snippet}`
+                )
+                .join('\n\n---\n\n');
+
+            setSessions((prev) =>
+              prev.map((s) => {
+                if (s.id !== activeSession.id) return s;
+                return {
+                  ...s,
+                  messages: s.messages.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          content: resultsFormatted,
+                          webSources: data.results,
+                          searchStatus: null,
+                          isStreaming: false,
+                        }
+                      : m
+                  ),
+                };
+              })
+            );
+          } else {
+            const errorText =
+              `### Web Search Results\n\nNo search results found for "${userInput.trim()}". ` +
+              (data.error ? `\n\n*${data.error}*` : '') +
+              `\n\n*Tip: You can select an AI model provider above or configure API keys in key settings.*`;
+
+            setSessions((prev) =>
+              prev.map((s) => {
+                if (s.id !== activeSession.id) return s;
+                return {
+                  ...s,
+                  messages: s.messages.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          content: errorText,
+                          searchStatus: null,
+                          isStreaming: false,
+                        }
+                      : m
+                  ),
+                };
+              })
+            );
+          }
+        } catch (err: unknown) {
+          const isAbort = (err as Error)?.name === 'AbortError';
+          setSessions((prev) =>
+            prev.map((s) => {
+              if (s.id !== activeSession.id) return s;
+              return {
+                ...s,
+                messages: s.messages.map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        error: isAbort
+                          ? 'Search cancelled'
+                          : 'Web search unavailable, please check network connection',
+                        errorType: 'connection_lost',
+                        canRetry: true,
+                        isStreaming: false,
+                        searchStatus: null,
+                      }
+                    : m
+                ),
+              };
+            })
+          );
+        } finally {
+          setIsGenerating(false);
+        }
+        return;
+      }
+
       const hasDoc = Boolean(activeSession.documentAttached);
       const promptMentionsDoc = /\b(document|pdf|file|attached|rag|report|excerpt|paper)\b/i.test(
         userInput
@@ -248,8 +370,6 @@ export function useChat(
 
       let accumulated = '';
       let receivedDone = false;
-
-      const storedKeys = getStoredApiKeys();
 
       try {
         const response = await fetch('/api/chat', {

@@ -147,11 +147,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   };
 
   return (
-    <div
-      className={`group w-full py-4 px-4 sm:px-6 transition-colors ${
-        isUser ? 'bg-transparent' : 'bg-neutral-900/30 border-y border-neutral-850/60'
-      }`}
-    >
+    <div className="group w-full py-3.5 px-4 sm:px-6 transition-colors bg-transparent">
       <div className="max-w-3xl mx-auto flex items-start gap-4">
         {/* Avatar */}
         <div className="shrink-0 mt-0.5">

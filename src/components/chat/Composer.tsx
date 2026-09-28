@@ -64,7 +64,7 @@ export const Composer: React.FC<ComposerProps> = ({
   };
 
   const handleSubmit = () => {
-    if (!input.trim() || isGenerating || !currentProvider || !hasKeyForSelectedModel) return;
+    if (!input.trim() || isGenerating) return;
     onSendMessage(input);
     setInput('');
     if (textareaRef.current) {
@@ -72,7 +72,7 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  const canSend = input.trim().length > 0 && Boolean(currentProvider) && hasKeyForSelectedModel && !isGenerating;
+  const canSend = input.trim().length > 0 && !isGenerating;
 
   return (
     <div className="w-full max-w-3xl mx-auto">
@@ -131,16 +131,14 @@ export const Composer: React.FC<ComposerProps> = ({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={!currentProvider || !hasKeyForSelectedModel}
+          disabled={isGenerating}
           rows={1}
           placeholder={
-            !currentProvider
-              ? 'Select a model provider above to start chatting...'
-              : hasKeyForSelectedModel
-              ? attachedDoc
-                ? `Ask questions grounded in ${attachedDoc.filename}...`
-                : `Message ${modelMeta?.name || 'model'}... (Shift+Enter for new line)`
-              : `API key required for ${providerMeta?.name}...`
+            !currentProvider || !hasKeyForSelectedModel
+              ? 'Search the web directly (or select an AI model above)...'
+              : attachedDoc
+              ? `Ask questions grounded in ${attachedDoc.filename}...`
+              : `Message ${modelMeta?.name || 'model'}... (Shift+Enter for new line)`
           }
           className="w-full bg-transparent px-4 pt-3 pb-2 text-sm text-neutral-100 placeholder:text-neutral-500 resize-none focus:outline-none max-h-48 font-sans disabled:cursor-not-allowed"
         />
@@ -153,27 +151,24 @@ export const Composer: React.FC<ComposerProps> = ({
             <button
               type="button"
               onClick={onToggleWebSearch}
-              disabled={!currentProvider}
               title={
                 webSearchEnabled
-                  ? currentProvider === 'gemini'
-                    ? 'Web search enabled via Gemini Google Search grounding'
-                    : 'Web search enabled via Tavily Search'
-                  : 'Enable Web Search Grounding'
+                  ? 'Web search enabled'
+                  : 'Enable Web Search'
               }
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                !currentProvider
-                  ? 'bg-neutral-850/30 border-neutral-850 text-neutral-600 cursor-not-allowed'
-                  : webSearchEnabled
-                  ? 'bg-blue-950/60 border-blue-700/80 text-blue-300 shadow-sm cursor-pointer'
-                  : 'bg-neutral-850/60 border-neutral-800 text-neutral-400 hover:text-neutral-200 cursor-pointer'
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                webSearchEnabled || !currentProvider || !hasKeyForSelectedModel
+                  ? 'bg-blue-950/60 border-blue-700/80 text-blue-300 shadow-sm'
+                  : 'bg-neutral-850/60 border-neutral-800 text-neutral-400 hover:text-neutral-200'
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
               <span className="text-[11px] font-medium">Search</span>
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  webSearchEnabled ? 'bg-blue-400 animate-pulse' : 'bg-neutral-600'
+                  webSearchEnabled || !currentProvider || !hasKeyForSelectedModel
+                    ? 'bg-blue-400 animate-pulse'
+                    : 'bg-neutral-600'
                 }`}
               />
             </button>
@@ -223,11 +218,11 @@ export const Composer: React.FC<ComposerProps> = ({
                     : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                 }`}
                 title={
-                  !currentProvider
-                    ? 'Please select a provider first'
-                    : !hasKeyForSelectedModel
-                    ? `Please configure an API key for ${providerMeta?.name}`
-                    : 'Send message'
+                  canSend
+                    ? !currentProvider || !hasKeyForSelectedModel
+                      ? 'Search the web directly'
+                      : 'Send message'
+                    : 'Type a message or search query'
                 }
               >
                 <ArrowUp className="w-4 h-4 stroke-[2.5]" />
